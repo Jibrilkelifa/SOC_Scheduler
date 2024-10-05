@@ -16,6 +16,10 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Long> {
 
     @Query("SELECT COUNT(s) FROM Schedule s WHERE s.user = :user AND s.date BETWEEN :startDate AND :endDate AND s.type = 'DAY_OFF'")
     Long countDayOffHoursByUser(@Param("user") Userr user, @Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
+    @Query("SELECT DISTINCT s.user FROM Schedule s WHERE s.date >= :startDate AND s.date <= :endDate AND s.type = :shiftType")
+    List<Userr> findUsersAssignedOnSundays(@Param("startDate") LocalDate startDate,
+                                           @Param("endDate") LocalDate endDate,
+                                           @Param("shiftType") ScheduleType shiftType);
 
     long countByUserAndShift(Userr user, Shift shift);
 
@@ -46,4 +50,26 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Long> {
 
     @Query("SELECT COALESCE(SUM(s.hours), 0) FROM Schedule s WHERE s.user = :user AND s.date BETWEEN :startDate AND :endDate")
     Long sumHoursByUser(@Param("user") Userr user, @Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
+
+    boolean existsByUserAndShiftAndDateBetween(Userr user, Shift shift, LocalDate startOfWeek, LocalDate endOfWeek);
+
+    @Query("SELECT COALESCE(SUM(s.shift.hours), 0) FROM Schedule s WHERE s.user = :user AND s.date BETWEEN :startOfWeek AND :endOfWeek")
+    Long getTotalShiftHoursForUser(@Param("user") Userr user, @Param("startOfWeek") LocalDate startOfWeek, @Param("endOfWeek") LocalDate endOfWeek);
+
+    @Query("SELECT COALESCE(SUM(s.hours), 0) FROM Schedule s WHERE s.user = :user AND s.date BETWEEN :startOfWeek AND :endOfWeek AND s.type = 'REGULAR_JOB'")
+    Long getTotalRegularJobHoursForUser(@Param("user") Userr user, @Param("startOfWeek") LocalDate startOfWeek, @Param("endOfWeek") LocalDate endOfWeek);
+//    @Query("SELECT s.user FROM Schedule s WHERE s.date BETWEEN :startDate AND :endDate AND s.type = :shiftType GROUP BY s.user")
+//    List<Userr> findUsersAssignedOnSundays(@Param("startDate") LocalDate startDate,
+//                                           @Param("endDate") LocalDate endDate,
+//
+//                                           @Query("SELECT s.user FROM Schedule s WHERE s.date BETWEEN :startDate AND :endDate AND s.type = :shiftType GROUP BY s.user")
+@Query("SELECT s.user FROM Schedule s WHERE s.date BETWEEN :startDate AND :endDate AND s.type = :shiftType GROUP BY s.user")
+List<Userr> findUsersAssignedOnLastThreeSundays(@Param("startDate") LocalDate startDate,
+                                                @Param("endDate") LocalDate endDate,
+                                                @Param("shiftType") ScheduleType shiftType);
+
+
+    @Query("SELECT s.user FROM Schedule s WHERE s.date = :lastSunday AND s.type = :shiftType")
+    List<Userr> findUsersAssignedOnLastSunday(@Param("lastSunday") LocalDate lastSunday, @Param("shiftType") ScheduleType shiftType);
+
 }

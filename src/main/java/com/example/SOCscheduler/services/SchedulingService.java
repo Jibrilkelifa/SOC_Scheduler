@@ -316,10 +316,53 @@ public class SchedulingService {
 
 
     private void assignShift3(List<Userr> users, Shift shift, LocalDate date, boolean isSunday) {
+        // If it's Sunday, filter out users assigned on the previous Sunday
+        if (isSunday) {
+            List<Userr> usersAssignedLastSunday = scheduleRepository.findUsersAssignedOnLastSunday(date.minusWeeks(1), ScheduleType.SOC_SHIFT);
+
+            users = users.stream()
+                    .filter(user -> !usersAssignedLastSunday.contains(user)) // Filter out users assigned last Sunday
+                    .filter(user -> user.getId() == 1 || !"female".equalsIgnoreCase(user.getGender())) // Further filter by gender
+                    .collect(Collectors.toList());
+
+            // If no users are left after filtering, log the information and return
+            if (users.isEmpty()) {
+                logger.info("No available users to assign for Shift 3 on Sunday");
+                return;
+            }
+        }
+
+        // Filter out User ID 1 for certain days
+        DayOfWeek dayOfWeek = date.getDayOfWeek();
+        if (dayOfWeek == DayOfWeek.WEDNESDAY || dayOfWeek == DayOfWeek.THURSDAY || dayOfWeek == DayOfWeek.TUESDAY ||
+                dayOfWeek == DayOfWeek.SATURDAY || dayOfWeek == DayOfWeek.SUNDAY || dayOfWeek == DayOfWeek.MONDAY) {
+            users = users.stream()
+                    .filter(user -> user.getId() != 1) // Exclude User ID 1 on these days
+                    .collect(Collectors.toList());
+        }
+
+        // Specific scheduling for User ID 1 on Fridays
+        if (isUserIdOne(users, 1, date)) {
+            // User ID 1 specific schedule on Friday
+            if (date.getDayOfWeek() == DayOfWeek.FRIDAY) {
+                Userr user = getUserById(users, 1);
+                scheduleRepository.save(new Schedule(user, shift, date, ScheduleType.SOC_SHIFT));
+
+                // Assign a day off for User ID 1 after Shift 3 on Friday
+                LocalDate dayOff = date.plusDays(1); // The next day
+                if (!isAlreadyScheduled(user, dayOff)) {
+                    scheduleRepository.save(new Schedule(user, null, dayOff, ScheduleType.DAY_OFF));
+                }
+                return; // Exit as we have assigned the shift and day off
+            }
+        }
+
+        // Filter available users
         List<Userr> availableUsers = users.stream()
-                .filter(user -> !"female".equalsIgnoreCase(user.getGender()))
-                .filter(user -> !isAlreadyScheduled(user, date))
-                .filter(user -> !hasAssignedShift(user, date, shift))
+                .filter(user -> !"female".equalsIgnoreCase(user.getGender())) // Filter by gender for Shift 3
+                .filter(user -> !isAlreadyScheduled(user, date)) // Check if the user is already scheduled on the same day
+                .filter(user -> !hasAssignedShift(user, date, shift)) // Check if the user has been assigned this shift
+                .filter(user -> !isAssignedToShiftThisWeek(user, shift, date)) // Check if the user has this shift during the week
                 .collect(Collectors.toList());
 
         logger.info("Assigning Shift 3 to users");
@@ -330,24 +373,25 @@ public class SchedulingService {
         // Sort users by the number of shifts they have been assigned
         List<Userr> sortedUsers = sortUsersByShiftCount(availableUsers, shiftCounts);
 
-        for (int i = 0; i < 2; i++) {
-            if (i < sortedUsers.size()) {
-                Userr user = sortedUsers.get(i);
-                scheduleRepository.save(new Schedule(user, shift, date, ScheduleType.SOC_SHIFT));
+        // Assign the shift to the first available user
+        if (!availableUsers.isEmpty()) {
+            Userr user = sortedUsers.get(0);  // Pick the first available user
+            scheduleRepository.save(new Schedule(user, shift, date, ScheduleType.SOC_SHIFT));
 
-                // Set the next day as day off
-                LocalDate dayOff = date.plusDays(1);
-                if (!isAlreadyScheduled(user, dayOff)) {
-                    scheduleRepository.save(new Schedule(user, null, dayOff, ScheduleType.DAY_OFF));
-                }
+            // Set the next day as a day off
+            LocalDate dayOff = date.plusDays(1);
+            if (!isAlreadyScheduled(user, dayOff)) {
+                scheduleRepository.save(new Schedule(user, null, dayOff, ScheduleType.DAY_OFF));
             }
         }
     }
+
 
     private void assignShift2(List<Userr> users, Shift shift, LocalDate date) {
         List<Userr> availableUsers = users.stream()
                 .filter(user -> !"female".equalsIgnoreCase(user.getGender()))
                 .filter(user -> !isAlreadyScheduled(user, date))
+                .filter(user -> !isAssignedToShiftThisWeek(user, shift, date))
                 .collect(Collectors.toList());
 
         logger.info("Assigning Shift 2 to users");
@@ -359,25 +403,50 @@ public class SchedulingService {
         List<Userr> sortedUsers = sortUsersByShiftCount(availableUsers, shiftCounts);
 
         // Assign Shift 2 to 2 users
-        for (int i = 0; i < 2; i++) {
-            if (i < sortedUsers.size()) {
-                Userr user = sortedUsers.get(i);
+//        for (int i = 0; i < 2; i++) {
+//            if (i < sortedUsers.size()) {
+//                Userr user = sortedUsers.get(i);
+//                scheduleRepository.save(new Schedule(user, shift, date, ScheduleType.SOC_SHIFT));
+//
+//                // Set the next day as day off
+//                LocalDate dayOff = date.plusDays(1);
+//                if (!isAlreadyScheduled(user, dayOff)) {
+//                    scheduleRepository.save(new Schedule(user, null, dayOff, ScheduleType.DAY_OFF));
+//                }
+//            }
+//        }
+        if (!sortedUsers.isEmpty()) {
+            // Get the first user from the sorted list
+            Userr user = sortedUsers.get(0);
+
+            // Check if the user is already assigned a shift on the same day
+            if (!isAlreadyScheduled(user, date)) {
+                // Assign the user to the shift
                 scheduleRepository.save(new Schedule(user, shift, date, ScheduleType.SOC_SHIFT));
 
-                // Set the next day as day off
+                // Set the next day as a day off if not already scheduled
                 LocalDate dayOff = date.plusDays(1);
                 if (!isAlreadyScheduled(user, dayOff)) {
                     scheduleRepository.save(new Schedule(user, null, dayOff, ScheduleType.DAY_OFF));
                 }
             }
         }
+
     }
 
     private void assignOtherShifts(List<Userr> users, Shift shift, LocalDate date, boolean isSunday, List<Shift> femaleShifts, String shiftType) {
-        // If it's Sunday and the first user is female, filter out females and proceed with assigning shifts to other analysts
+        // If it's Sunday, ensure that users who were assigned last Sunday are excluded
         if (isSunday) {
+            // Get the date range for the last three weeks
+            LocalDate threeWeeksAgo = date.minusWeeks(3);
+            LocalDate lastSunday = date.minusWeeks(1);
+
+            // Get users assigned on Sundays in the last three weeks and filter them out
+            List<Userr> usersAssignedLastThreeSundays = scheduleRepository.findUsersAssignedOnSundays(
+                    threeWeeksAgo, lastSunday, ScheduleType.SOC_SHIFT);
+
             users = users.stream()
-                    .filter(user -> !"female".equalsIgnoreCase(user.getGender()))
+                    .filter(user -> !usersAssignedLastThreeSundays.contains(user)) // Filter out users assigned in the last three Sundays
                     .collect(Collectors.toList());
 
             // If no users are left after filtering, log the information and return
@@ -387,10 +456,27 @@ public class SchedulingService {
             }
         }
 
+
+
+
+        DayOfWeek dayOfWeek = date.getDayOfWeek();
+        if (dayOfWeek == DayOfWeek.WEDNESDAY || dayOfWeek == DayOfWeek.FRIDAY ||
+                dayOfWeek == DayOfWeek.SATURDAY || dayOfWeek == DayOfWeek.MONDAY) {
+            users = users.stream()
+                    .filter(user -> user.getId() != 1) // Filter out User ID 1 on these days
+                    .collect(Collectors.toList());
+        }
+
         // Filter users based on the shift type and gender rules
         List<Userr> availableUsers = users.stream()
                 .filter(user -> !isAlreadyScheduled(user, date))
+                .filter(user -> !isAssignedToShiftThisWeek(user, shift, date))
+                .filter(user -> getTotalHoursForWeek(user, date) + shift.getHours() <= 48)
                 .filter(user -> {
+                    // Allow females on Sundays, but enforce restrictions on weekdays
+                    if (isSunday) {
+                        return true; // Allow all users on Sunday
+                    }
                     // For three-shift scenario
                     if ("three_shift".equals(shiftType)) {
                         return !("female".equalsIgnoreCase(user.getGender()) && "Shift 3".equals(shift.getName()));
@@ -401,6 +487,7 @@ public class SchedulingService {
                     }
                     return true; // Default case
                 })
+
                 .collect(Collectors.toList());
 
         // Sort users to ensure fair distribution
@@ -409,21 +496,20 @@ public class SchedulingService {
 
         logger.info("Assigning other shifts for shift type: " + shiftType);
 
-        for (int i = 0; i < 2; i++) {
-            if (i < sortedUsers.size()) {
-                Userr user = sortedUsers.get(i);
-                // Always assign SOC shifts, even on Sundays
-                ScheduleType scheduleType = ScheduleType.SOC_SHIFT;
-                scheduleRepository.save(new Schedule(user, shift, date, scheduleType));
-            }
+        if (!availableUsers.isEmpty()) {
+            Userr user = availableUsers.get(0);  // Pick the first available user
+            scheduleRepository.save(new Schedule(user, shift, date, ScheduleType.SOC_SHIFT));
         }
     }
 
-
+    private List<Userr> getAllUsers() {
+        return userRepository.findAll(); // Fetches all users from the database
+    }
 
 
     private void assignRegularJobs(List<Userr> users, LocalDate date) {
         for (Userr user : users) {
+
             // Check if the user is scheduled for any SOC shift on the given date
             boolean isScheduledForSOCShift = scheduleRepository.existsByUserAndDateAndType(user, date, ScheduleType.SOC_SHIFT);
 
@@ -467,6 +553,57 @@ public class SchedulingService {
                 ))
                 .collect(Collectors.toList());
     }
+    private void assignShiftOnSunday(List<Userr> users, Shift shift, LocalDate date) {
+        if (date.getDayOfWeek() == DayOfWeek.SUNDAY) {
+            // Get users who were assigned on the previous Sunday
+            List<Userr> usersAssignedLastSunday = getUsersAssignedLastSunday(date);
+
+            // Filter out users who were assigned on the previous Sunday
+            users = users.stream()
+                    .filter(user -> !usersAssignedLastSunday.contains(user))
+                    .collect(Collectors.toList());
+
+            // If all users have been rotated, reset the rotation and allow them to be reassigned
+            if (users.isEmpty()) {
+                users = getAllAvailableUsers(); // Reset the list with all users
+            }
+        }
+
+        // Now assign shifts to the available users, ensuring fair distribution
+        List<Userr> availableUsers = users.stream()
+                .filter(user -> !isAlreadyScheduled(user, date))
+                .filter(user -> getTotalHoursForWeek(user, date) + shift.getHours() <= 48)
+                .collect(Collectors.toList());
+
+        // Ensure fair distribution by tracking the number of Sunday assignments
+        Map<Userr, Long> sundayShiftCounts = getShiftCounts(availableUsers, shift);
+
+        // Sort users based on the number of Sunday shifts they've been assigned
+        List<Userr> sortedUsers = sortUsersByShiftCount(availableUsers, sundayShiftCounts);
+
+        if (!availableUsers.isEmpty()) {
+            Userr user = availableUsers.get(0);  // Pick the first available user
+            scheduleRepository.save(new Schedule(user, shift, date, ScheduleType.SOC_SHIFT));
+        }
+    }
+
+    public List<Userr> getAllAvailableUsers() {
+        // Retrieve all users from the database
+        List<Userr> allUsers = userRepository.findAll();
+
+        // Filter out users who are already assigned shifts for that day or week (if needed)
+        List<Userr> availableUsers = allUsers.stream()
+                .filter(user -> !isAlreadyScheduled(user, LocalDate.now())) // Adjust the filter condition as needed
+                .collect(Collectors.toList());
+
+        return availableUsers;
+    }
+    public List<Userr> getUsersAssignedLastSunday(LocalDate date) {
+        LocalDate lastSunday = date.minusWeeks(1).with(DayOfWeek.SUNDAY);
+        return scheduleRepository.findUsersAssignedOnLastSunday(lastSunday, ScheduleType.SOC_SHIFT);
+    }
+
+
 
     private void verifyWeeklyWorkingHours(List<Userr> users, LocalDate startDate, LocalDate endDate) {
         for (Userr user : users) {
@@ -483,6 +620,28 @@ public class SchedulingService {
             }
         }
     }
+    public Map<Userr, Long> verifyWeeklyWorkingHourss(List<Userr> users, LocalDate startDate, LocalDate endDate) {
+        Map<Userr, Long> userHoursMap = new HashMap<>();
+
+        for (Userr user : users) {
+            // Fetch total hours for the user within the given date range
+            Long totalHours = scheduleRepository.sumHoursByUser(user, startDate, endDate);
+
+            // Assuming 40 hours is the weekly standard
+            if (totalHours == null) {
+                totalHours = 0L;
+            }
+
+            userHoursMap.put(user, totalHours);
+
+            if (totalHours != 40) {
+                logger.warn("User {} does not meet weekly working hour requirements. Total hours: {}", user.getName(), totalHours);
+            }
+        }
+
+        return userHoursMap;
+    }
+
 
     public List<Schedule> getAllSchedules() {
         return scheduleRepository.findAll();
@@ -507,6 +666,34 @@ public class SchedulingService {
         ));
 
     }
+    private boolean isAssignedToShiftThisWeek(Userr user, Shift shift, LocalDate date) {
+        LocalDate startOfWeek = date.with(DayOfWeek.MONDAY);  // Get start of the week (Monday)
+        LocalDate endOfWeek = date.with(DayOfWeek.SUNDAY);    // Get end of the week (Sunday)
+
+        // Check if user is already assigned to the same shift in the week range
+        return scheduleRepository.existsByUserAndShiftAndDateBetween(user, shift, startOfWeek, endOfWeek);
+    }
+    private boolean isUserIdOne(List<Userr> users, int userId, LocalDate date) {
+        return users.stream().anyMatch(user -> user.getId() == userId);
+    }
+
+    private Userr getUserById(List<Userr> users, int userId) {
+        return users.stream().filter(user -> user.getId() == userId).findFirst().orElse(null);
+    }
+    private int getTotalHoursForWeek(Userr user, LocalDate date) {
+        LocalDate startOfWeek = date.with(DayOfWeek.MONDAY);  // Get start of the week (Monday)
+        LocalDate endOfWeek = date.with(DayOfWeek.SUNDAY);    // Get end of the week (Sunday)
+
+        // Calculate total hours from shifts and regular jobs
+// Change int to Long to match the return type from the repository methods
+        Long totalShiftHours = scheduleRepository.getTotalShiftHoursForUser(user, startOfWeek, endOfWeek);
+        Long totalRegularJobHours = scheduleRepository.getTotalRegularJobHoursForUser(user, startOfWeek, endOfWeek);
+
+
+        return (int) (totalShiftHours + totalRegularJobHours);
+    }
+
+
 
 }
 

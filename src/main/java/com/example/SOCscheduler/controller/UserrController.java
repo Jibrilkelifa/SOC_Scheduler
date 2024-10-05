@@ -20,14 +20,14 @@ public class UserrController {
     private UserrService userrService;
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('SMS_ADaMIN')")
+    @PreAuthorize("hasAnyRole('SMS_ADMIN')")
     public ResponseEntity<Userr> createUser(@RequestBody Userr user) {
         Userr savedUser = userRepository.save(user);
         return ResponseEntity.ok(savedUser);
     }
 
     @GetMapping("/all")
-    @PreAuthorize("hasAnyRole('SMS_ADMIN')")
+    @PreAuthorize("hasAnyRole('SMS_ADMIN','SMS_USER')")
     public ResponseEntity<List<Userr>> getAllUsers() {
         List<Userr> users = userRepository.findAll();
         return ResponseEntity.ok(users);
@@ -40,12 +40,14 @@ public class UserrController {
 
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('SMS_ADMIN')")
     public ResponseEntity<Userr> updateUser(@PathVariable Long id, @RequestBody Userr userr) {
         Userr updatedUser = userrService.updateUser(id, userr);
         return updatedUser != null ? ResponseEntity.ok(updatedUser) : ResponseEntity.notFound().build();
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('SMS_ADMIN')")
     public ResponseEntity<Void> deleteUser(@PathVariable Long id) {
         userrService.deleteUser(id);
         return ResponseEntity.noContent().build();

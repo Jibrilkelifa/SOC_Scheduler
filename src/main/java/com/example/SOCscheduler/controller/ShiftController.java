@@ -23,7 +23,7 @@ public class ShiftController {
     }
 
     @GetMapping("/all")
-    @PreAuthorize("hasAnyRole('SMS_ADMIN')")
+    @PreAuthorize("hasAnyRole('SMS_ADMIN','SMS_USER')")
     public ResponseEntity<List<Shift>> getAllShifts() {
         List<Shift> shifts = shiftRepository.findAll();
         return ResponseEntity.ok(shifts);
