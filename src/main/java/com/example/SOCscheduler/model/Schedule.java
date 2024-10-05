@@ -38,6 +38,9 @@ public class Schedule {
         this.hours = (type == ScheduleType.REGULAR_JOB) ? 8 : (shift != null ? shift.getHours() : 0);
     }
 
+    public Schedule(Userr user, Object o, LocalDate dayOff, ScheduleType scheduleType, int i) {
+    }
+
     public int getHours() {
         return hours;
     }

@@ -437,16 +437,11 @@ public class SchedulingService {
     private void assignOtherShifts(List<Userr> users, Shift shift, LocalDate date, boolean isSunday, List<Shift> femaleShifts, String shiftType) {
         // If it's Sunday, ensure that users who were assigned last Sunday are excluded
         if (isSunday) {
-            // Get the date range for the last three weeks
-            LocalDate threeWeeksAgo = date.minusWeeks(3);
-            LocalDate lastSunday = date.minusWeeks(1);
-
-            // Get users assigned on Sundays in the last three weeks and filter them out
-            List<Userr> usersAssignedLastThreeSundays = scheduleRepository.findUsersAssignedOnSundays(
-                    threeWeeksAgo, lastSunday, ScheduleType.SOC_SHIFT);
+            // Get users assigned last Sunday and filter them out
+            List<Userr> usersAssignedLastSunday = scheduleRepository.findUsersAssignedOnLastSunday(date.minusWeeks(1), ScheduleType.SOC_SHIFT);
 
             users = users.stream()
-                    .filter(user -> !usersAssignedLastThreeSundays.contains(user)) // Filter out users assigned in the last three Sundays
+                    .filter(user -> !usersAssignedLastSunday.contains(user)) // Filter out users assigned last Sunday
                     .collect(Collectors.toList());
 
             // If no users are left after filtering, log the information and return
@@ -471,22 +466,22 @@ public class SchedulingService {
         List<Userr> availableUsers = users.stream()
                 .filter(user -> !isAlreadyScheduled(user, date))
                 .filter(user -> !isAssignedToShiftThisWeek(user, shift, date))
-                .filter(user -> getTotalHoursForWeek(user, date) + shift.getHours() <= 48)
-                .filter(user -> {
-                    // Allow females on Sundays, but enforce restrictions on weekdays
-                    if (isSunday) {
-                        return true; // Allow all users on Sunday
-                    }
-                    // For three-shift scenario
-                    if ("three_shift".equals(shiftType)) {
-                        return !("female".equalsIgnoreCase(user.getGender()) && "Shift 3".equals(shift.getName()));
-                    }
-                    // For two-shift scenario
-                    if ("two_shift".equals(shiftType)) {
-                        return !("female".equalsIgnoreCase(user.getGender()) && "Shift 2".equals(shift.getName()));
-                    }
-                    return true; // Default case
-                })
+//                .filter(user -> getTotalHoursForWeek(user, date) + shift.getHours() <= 48)
+//                .filter(user -> {
+//                    // Allow females on Sundays, but enforce restrictions on weekdays
+//                    if (isSunday) {
+//                        return true; // Allow all users on Sunday
+//                    }
+//                    // For three-shift scenario
+//                    if ("three_shift".equals(shiftType)) {
+//                        return !("female".equalsIgnoreCase(user.getGender()) && "Shift 3".equals(shift.getName()));
+//                    }
+//                    // For two-shift scenario
+//                    if ("two_shift".equals(shiftType)) {
+//                        return !("female".equalsIgnoreCase(user.getGender()) && "Shift 2".equals(shift.getName()));
+//                    }
+//                    return true; // Default case
+//                })
 
                 .collect(Collectors.toList());
 

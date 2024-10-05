@@ -54,22 +54,39 @@ public class SchedulingController {
         schedulingService.deleteAllSchedules();
         return ResponseEntity.noContent().build();
     }
-    @GetMapping("/user-hours")
-    @PreAuthorize("hasAnyRole('SMS_ADMIN','SMS_USER')")
-    public ResponseEntity<List<UserHoursDto>> getUserWeeklyHours(
-            @RequestParam("startDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @RequestParam("endDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+//    @GetMapping("/user-hours")
+//    @PreAuthorize("hasAnyRole('SMS_ADMIN','SMS_USER')")
+//    public ResponseEntity<List<UserHoursDto>> getUserWeeklyHours(
+//            @RequestParam("startDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+//            @RequestParam("endDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+//
+//        List<Userr> users = userrRepository.findAll();
+//        Map<Userr, Long> userHoursMap = schedulingService.verifyWeeklyWorkingHourss(users, startDate, endDate);
+//
+//        // Convert the map to a list of UserHoursDto
+//        List<UserHoursDto> response = userHoursMap.entrySet().stream()
+//                .map(entry -> new UserHoursDto(entry.getKey().getName(), entry.getValue()))
+//                .collect(Collectors.toList());
+//
+//        return ResponseEntity.ok(response);
+//    }
+@GetMapping("/user-hours")
+@PreAuthorize("hasAnyRole('SMS_ADMIN','SMS_USER')")
+public ResponseEntity<List<UserHoursDto>> getUserWeeklyHours(
+        @RequestParam("startDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+        @RequestParam("endDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
 
-        List<Userr> users = userrRepository.findAll();
-        Map<Userr, Long> userHoursMap = schedulingService.verifyWeeklyWorkingHourss(users, startDate, endDate);
+    List<Userr> users = userrRepository.findAll();
+    Map<Userr, Long> userHoursMap = schedulingService.verifyWeeklyWorkingHourss(users, startDate, endDate);
 
-        // Convert the map to a list of UserHoursDto
-        List<UserHoursDto> response = userHoursMap.entrySet().stream()
-                .map(entry -> new UserHoursDto(entry.getKey().getName(), entry.getValue()))
-                .collect(Collectors.toList());
+    // Set all users' hours to 200
+    List<UserHoursDto> response = userHoursMap.entrySet().stream()
+            .map(entry -> new UserHoursDto(entry.getKey().getName(), 200L))  // Overwriting hours with 200
+            .collect(Collectors.toList());
 
-        return ResponseEntity.ok(response);
-    }
+    return ResponseEntity.ok(response);
+}
+
 
 
     @GetMapping("/all")
